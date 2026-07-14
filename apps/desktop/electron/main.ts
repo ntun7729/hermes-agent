@@ -4010,6 +4010,7 @@ function runRenderTitleJob(rawUrl) {
       if (settled) {
         return
       }
+
       settled = true
 
       if (hardTimer) {
@@ -5463,7 +5464,6 @@ function openPortalLoginWindow() {
       if (settled) {
         return
       }
-
       settled = true
 
       if (pollTimer) {
