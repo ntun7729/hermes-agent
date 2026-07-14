@@ -41,6 +41,15 @@ def read_configured_mode() -> str:
         return normalize_mode(override)
 
     try:
+        from hermes_cli.config import load_config
+        config = load_config()
+        val = config.get("terminal", {}).get("windows_execution_mode")
+        if val:
+            return normalize_mode(val)
+    except Exception:
+        pass
+
+    try:
         data = json.loads(_config_path().read_text(encoding="utf-8"))
         return normalize_mode(data.get("mode"))
     except Exception:

@@ -72,6 +72,27 @@ def _windows_to_msys_path(cwd: str) -> str:
     return f"/{drive}/{tail}" if tail else f"/{drive}/"
 
 
+def _powershell_quote(s: str) -> str:
+    """Quote a string for safe use in PowerShell single-quoted strings."""
+    return "'" + s.replace("'", "''") + "'"
+
+
+def _find_powershell() -> str:
+    """Find powershell or pwsh executable on Windows."""
+    pwsh = shutil.which("pwsh")
+    if pwsh:
+        return pwsh
+    powershell = shutil.which("powershell")
+    if powershell:
+        return powershell
+    # Fallback to standard location
+    system32 = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32")
+    powershell_path = os.path.join(system32, "WindowsPowerShell", "v1.0", "powershell.exe")
+    if os.path.isfile(powershell_path):
+        return powershell_path
+    return "powershell.exe"
+
+
 def _bash_safe_path(path: str) -> str:
     """Return *path* in a form safe to embed in a Git Bash script.
 
@@ -1181,16 +1202,89 @@ class LocalEnvironment(BaseEnvironment):
             mode = resolve_windows_execution_mode(cwd)
             if mode.resolved == "wsl2":
                 return BaseEnvironment._quote_cwd_for_cd(windows_to_wsl_path(cwd, mode.distribution))
+            elif mode.resolved == "windows-native":
+                if cwd == "~" or cwd == "~/":
+                    return "~"
+                if cwd.startswith("~/"):
+                    suffix = cwd[2:].replace("/", "\\")
+                    return f"$HOME\\{_powershell_quote(suffix)}"
+                return _powershell_quote(cwd.replace("/", "\\"))
         return BaseEnvironment._quote_cwd_for_cd(_windows_to_msys_path(cwd))
 
     def _quote_shell_path(self, path: str) -> str:
-        """Rewrite host paths for Git Bash or WSL2 before shell interpolation."""
+        """Rewrite host paths for Git Bash, WSL2 or PowerShell before shell interpolation."""
         if _IS_WINDOWS:
             mode = resolve_windows_execution_mode(self.cwd)
             if mode.resolved == "wsl2":
                 import shlex
                 return shlex.quote(windows_to_wsl_path(path, mode.distribution))
+            elif mode.resolved == "windows-native":
+                return _powershell_quote(path)
         return _quote_bash_path(path)
+
+    def init_session(self):
+        if _IS_WINDOWS:
+            mode = resolve_windows_execution_mode(self.cwd)
+            if mode.resolved == "windows-native":
+                try:
+                    with open(self._snapshot_path, "w", encoding="utf-8") as f:
+                        for k, v in os.environ.items():
+                            f.write(f"{k}={v}\n")
+                    self._snapshot_ready = True
+                    logger.info("PowerShell local session initialized (cwd=%s)", self.cwd)
+                except Exception as exc:
+                    self._snapshot_ready = False
+                    logger.warning("Failed to initialize PowerShell local session: %s", exc)
+                return
+        super().init_session()
+
+    def _wrap_command(self, command: str, cwd: str) -> str:
+        if _IS_WINDOWS:
+            mode = resolve_windows_execution_mode(cwd)
+            if mode.resolved == "windows-native":
+                snapshot_path = self._snapshot_path
+                cwd_file = self._cwd_file
+                cwd_marker = self._cwd_marker
+                return f"""$ErrorActionPreference = 'Stop'
+if (Test-Path {_powershell_quote(cwd)}) {{
+    Set-Location -LiteralPath {_powershell_quote(cwd)}
+}}
+$ErrorActionPreference = 'Continue'
+
+if (Test-Path {_powershell_quote(snapshot_path)}) {{
+    Get-Content -LiteralPath {_powershell_quote(snapshot_path)} | ForEach-Object {{
+        if ($_ -match '^([^=]+)=(.*)$') {{
+            [System.Environment]::SetEnvironmentVariable($Matches[1], $Matches[2], 'Process')
+        }}
+    }}
+}}
+
+# Run command
+$__hermes_ec = 0
+try {{
+    {command}
+    if ($LASTEXITCODE -ne $null) {{ $__hermes_ec = $LASTEXITCODE }}
+    elif (-not $?) {{ $__hermes_ec = 1 }}
+}} catch {{
+    $__hermes_ec = 1
+}}
+
+# Dump env vars
+try {{
+    Get-ChildItem env: | ForEach-Object {{ "$($_.Name)=$($_.Value)" }} | Out-File -LiteralPath {_powershell_quote(snapshot_path)} -Encoding utf8 -Force
+}} catch {{}}
+
+# Write CWD and markers
+try {{
+    $current_cwd = (Get-Location).Path
+    [System.IO.File]::WriteAllText({_powershell_quote(cwd_file)}, $current_cwd)
+    [Console]::WriteLine("")
+    [Console]::WriteLine("{cwd_marker}" + $current_cwd + "{cwd_marker}")
+}} catch {{}}
+
+exit $__hermes_ec
+"""
+        return super()._wrap_command(command, cwd)
 
     def _run_bash(self, cmd_string: str, *, login: bool = False,
                   timeout: int = 120,
@@ -1211,7 +1305,12 @@ class LocalEnvironment(BaseEnvironment):
                 )
             self.cwd = safe_cwd
 
-        if mode and mode.resolved == "wsl2":
+        if mode and mode.resolved == "windows-native":
+            powershell = _find_powershell()
+            import base64
+            encoded_cmd = base64.b64encode(cmd_string.encode('utf-16-le')).decode('ascii')
+            args = [powershell, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", encoded_cmd]
+        elif mode and mode.resolved == "wsl2":
             if not mode.distribution:
                 raise RuntimeError("WSL2 mode is selected, but no WSL2 distribution is installed")
             args = build_wsl_bash_args(
@@ -1362,11 +1461,12 @@ class LocalEnvironment(BaseEnvironment):
                 cwd_path = f.read().strip()
             if _IS_WINDOWS:
                 mode = resolve_windows_execution_mode(self.cwd)
-                cwd_path = (
-                    wsl_to_windows_path(cwd_path, mode.distribution)
-                    if mode.resolved == "wsl2"
-                    else _msys_to_windows_path(cwd_path)
-                )
+                if mode.resolved == "wsl2":
+                    cwd_path = wsl_to_windows_path(cwd_path, mode.distribution)
+                elif mode.resolved == "windows-native":
+                    cwd_path = os.path.normpath(cwd_path)
+                else:
+                    cwd_path = _msys_to_windows_path(cwd_path)
             if cwd_path and os.path.isdir(cwd_path):
                 self.cwd = cwd_path
         except (OSError, FileNotFoundError):
@@ -1393,11 +1493,12 @@ class LocalEnvironment(BaseEnvironment):
         if self.cwd != prev_cwd:
             if _IS_WINDOWS:
                 mode = resolve_windows_execution_mode(prev_cwd)
-                normalized = (
-                    wsl_to_windows_path(self.cwd, mode.distribution)
-                    if mode.resolved == "wsl2"
-                    else _msys_to_windows_path(self.cwd)
-                )
+                if mode.resolved == "wsl2":
+                    normalized = wsl_to_windows_path(self.cwd, mode.distribution)
+                elif mode.resolved == "windows-native":
+                    normalized = os.path.normpath(self.cwd)
+                else:
+                    normalized = _msys_to_windows_path(self.cwd)
             else:
                 normalized = self.cwd
             if normalized and os.path.isdir(normalized):

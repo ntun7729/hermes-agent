@@ -43,9 +43,9 @@ const RAIL_ACTION =
   'grid size-6 place-items-center rounded text-(--ui-text-tertiary) transition-colors hover:bg-(--chrome-action-hover) hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring [-webkit-app-region:no-drag]'
 
 const TERMINAL_MODE_LABELS: Record<TerminalMode, string> = {
-  smart: 'Smart',
-  wsl2: 'WSL2',
-  'windows-native': 'Windows Native'
+  smart: 'Smart (AI Choice)',
+  wsl2: 'WSL2 (Bash)',
+  'windows-native': 'Windows Native (PowerShell)'
 }
 
 const TERMINAL_MODE_ICONS: Record<TerminalMode, string> = {
@@ -138,12 +138,12 @@ export function TerminalRail() {
         {modeInfo?.supported && (
           <DropdownMenu>
             <Tip
-              label={`Terminal mode: ${TERMINAL_MODE_LABELS[modeInfo.configuredMode]} (new terminals; agent commands update immediately)`}
+              label={`Agent Execution Environment: ${TERMINAL_MODE_LABELS[modeInfo.configuredMode]} (controls where the agent executes tools/commands)`}
               side="left"
             >
               <DropdownMenuTrigger asChild>
                 <button
-                  aria-label={`Terminal mode: ${TERMINAL_MODE_LABELS[modeInfo.configuredMode]}`}
+                  aria-label={`Agent Execution Environment: ${TERMINAL_MODE_LABELS[modeInfo.configuredMode]}`}
                   className={RAIL_ACTION}
                   type="button"
                 >
@@ -165,7 +165,7 @@ export function TerminalRail() {
               ))}
               {modeInfo.configuredMode === 'smart' && (
                 <div className="max-w-56 px-2 py-1 text-[0.65rem] text-(--ui-text-tertiary)">
-                  Smart uses WSL2 for projects opened through a WSL UNC path; other projects stay Windows native.
+                  Smart mode executes agent commands in WSL2 for projects under a WSL UNC path, and uses PowerShell for native Windows projects.
                 </div>
               )}
             </DropdownMenuContent>
