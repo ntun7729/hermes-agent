@@ -1,0 +1,104 @@
+...F..                                                                   [100%]
+=================================== FAILURES ===================================
+__________________ test_smart_mode_keeps_drive_project_native __________________
+
+    def test_smart_mode_keeps_drive_project_native():
+        result = resolve_windows_execution_mode(
+            r"C:\Users\shay\project",
+            configured="smart",
+            distributions=["Ubuntu"],
+            is_windows=True,
+        )
+>       assert result.resolved == "windows-native"
+E       AssertionError: assert 'wsl2' == 'windows-native'
+E         
+E         - windows-native
+E         + wsl2
+
+tests/tools/test_windows_execution_mode.py:39: AssertionError
+=========================== short test summary info ============================
+FAILED tests/tools/test_windows_execution_mode.py::test_smart_mode_keeps_drive_project_native - AssertionError: assert 'wsl2' == 'windows-native'
+  
+  - windows-native
+  + wsl2
+1 failed, 5 passed in 0.25s
+
+> hermes@0.17.0 typecheck
+> tsc -p . --noEmit && tsc -p tsconfig.electron.json --noEmit
+
+src/app/right-sidebar/terminal/rail.tsx(35,36): error TS2304: Cannot find name 'DesktopTerminalMode'.
+src/app/right-sidebar/terminal/rail.tsx(41,35): error TS2304: Cannot find name 'DesktopTerminalMode'.
+src/app/right-sidebar/terminal/rail.tsx(58,44): error TS2304: Cannot find name 'DesktopTerminalModeInfo'.
+src/app/right-sidebar/terminal/rail.tsx(73,29): error TS2304: Cannot find name 'DesktopTerminalMode'.
+src/app/right-sidebar/terminal/rail.tsx(145,54): error TS2304: Cannot find name 'DesktopTerminalMode'.
+npm error Lifecycle script `typecheck` failed with error:
+npm error code 2
+npm error path /home/runner/work/hermes-agent/hermes-agent/apps/desktop
+npm error workspace hermes@0.17.0
+npm error location /home/runner/work/hermes-agent/hermes-agent/apps/desktop
+npm error command failed
+npm error command sh -c tsc -p . --noEmit && tsc -p tsconfig.electron.json --noEmit
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.9 [39m[90m/home/runner/work/hermes-agent/hermes-agent/apps/desktop[39m
+
+ [31m❯[39m [30m[43m electron [49m[39m electron/terminal-mode.test.ts [2m([22m[2m6 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[32m 13[2mms[22m[39m
+     [32m✓[39m normalizes unknown values to smart[32m 2[2mms[22m[39m
+     [32m✓[39m parses the null-padded output returned by wsl.exe[32m 1[2mms[22m[39m
+     [32m✓[39m uses WSL for a matching UNC project in smart mode[32m 1[2mms[22m[39m
+[31m     [31m×[31m keeps ordinary Windows projects native in smart mode[39m[32m 7[2mms[22m[39m
+     [32m✓[39m forces the first installed distro in WSL2 mode[32m 0[2mms[22m[39m
+     [32m✓[39m maps Windows and WSL UNC paths[32m 0[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m [30m[43m electron [49m[39m electron/terminal-mode.test.ts[2m > [22mterminal mode[2m > [22mkeeps ordinary Windows projects native in smart mode
+[31m[1mAssertionError[22m: expected { Object (distribution, mode) } to deeply equal { distribution: null, …(1) }[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[32m-   "distribution": null,[39m
+[32m-   "mode": "windows-native",[39m
+[31m+   "distribution": "Ubuntu",[39m
+[31m+   "mode": "wsl2",[39m
+[2m  }[22m
+
+[36m [2m❯[22m electron/terminal-mode.test.ts:[2m44:7[22m[39m
+    [90m 42|[39m         wslDistributions[33m:[39m [[32m'Ubuntu'[39m]
+    [90m 43|[39m       })
+    [90m 44|[39m     )[33m.[39m[34mtoEqual[39m({ distribution[33m:[39m [35mnull[39m[33m,[39m mode[33m:[39m [32m'windows-native'[39m })
+    [90m   |[39m       [31m^[39m
+    [90m 45|[39m   })
+    [90m 46|[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m5 passed[39m[22m[90m (6)[39m
+[2m   Start at [22m 00:29:59
+[2m   Duration [22m 189ms[2m (transform 31ms, setup 0ms, import 45ms, tests 13ms, environment 0ms)[22m
+
+
+::error file=/home/runner/work/hermes-agent/hermes-agent/apps/desktop/electron/terminal-mode.test.ts,title=[electron] electron/terminal-mode.test.ts > terminal mode > keeps ordinary Windows projects native in smart mode,line=44,column=7::AssertionError: expected { Object (distribution, mode) } to deeply equal { distribution: null, …(1) }%0A%0A- Expected%0A+ Received%0A%0A  {%0A-   "distribution": null,%0A-   "mode": "windows-native",%0A+   "distribution": "Ubuntu",%0A+   "mode": "wsl2",%0A  }%0A%0A ❯ electron/terminal-mode.test.ts:44:7%0A%0A
+
+/home/runner/work/hermes-agent/hermes-agent/apps/desktop/electron/main.ts
+    68:1  error    Expected "./gateway-ws-probe" to come before "./wsl-path-bridge"   perfectionist/sort-imports
+   145:1  error    Expected "./terminal-mode" to come before "./wsl-clipboard-image"  perfectionist/sort-imports
+  5478:7  warning  Expected blank line before this statement                          padding-line-between-statements
+  5564:5  warning  Expected blank line before this statement                          padding-line-between-statements
+  5932:3  warning  Expected blank line before this statement                          padding-line-between-statements
+  6927:3  warning  Expected blank line before this statement                          padding-line-between-statements
+  6934:3  warning  Expected blank line before this statement                          padding-line-between-statements
+  8247:3  warning  Expected blank line before this statement                          padding-line-between-statements
+
+/home/runner/work/hermes-agent/hermes-agent/apps/desktop/electron/terminal-mode.ts
+  54:14  error  Unexpected control character(s) in regular expression: \x00  no-control-regex
+
+/home/runner/work/hermes-agent/hermes-agent/apps/desktop/src/app/right-sidebar/terminal/rail.tsx
+  6:1  error  Expected "@/components/ui/context-menu" to come before "@/components/ui/dropdown-menu"  perfectionist/sort-imports
+
+✖ 10 problems (4 errors, 6 warnings)
+  3 errors and 6 warnings potentially fixable with the `--fix` option.
+

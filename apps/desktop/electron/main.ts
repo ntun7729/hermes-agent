@@ -1,4 +1,3 @@
-
 import { execFile, execFileSync, spawn } from 'node:child_process'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
@@ -84,7 +83,14 @@ import {
   reviewUnstage
 } from './git-review-ops'
 import { gitRootForIpc } from './git-root'
-import { addWorktree, listBaseBranches, listBranches, listWorktrees, removeWorktree, switchBranch } from './git-worktree-ops'
+import {
+  addWorktree,
+  listBaseBranches,
+  listBranches,
+  listWorktrees,
+  removeWorktree,
+  switchBranch
+} from './git-worktree-ops'
 import {
   DATA_URL_READ_MAX_BYTES,
   DEFAULT_FETCH_TIMEOUT_MS,
@@ -127,10 +133,22 @@ import {
   MIN_WIDTH as WINDOW_MIN_WIDTH
 } from './window-state'
 import { hiddenWindowsChildOptions } from './windows-child-options'
-import { buildPathExtCandidates, chooseUpdaterArgs, getVenvSitePackagesEntries, resolveVenvHermesCommand } from './windows-hermes-path'
+import {
+  buildPathExtCandidates,
+  chooseUpdaterArgs,
+  getVenvSitePackagesEntries,
+  resolveVenvHermesCommand
+} from './windows-hermes-path'
 import { readWindowsUserEnvVar } from './windows-user-env'
 import { isPackagedInstallPath as isPackagedInstallPathUnderRoots } from './workspace-cwd'
 import { readWslWindowsClipboardImage } from './wsl-clipboard-image'
+import {
+  detectWslDistributions,
+  readTerminalMode,
+  resolveWindowsTerminalMode,
+  toWslPath,
+  writeTerminalMode
+} from './terminal-mode'
 
 const USER_DATA_OVERRIDE = process.env.HERMES_DESKTOP_USER_DATA_DIR
 
@@ -8223,7 +8241,49 @@ function windowsShellSpec() {
 
 // Resolve the interactive shell for the embedded terminal: an explicit user
 // override wins, otherwise auto-detect the best one installed for the platform.
-function terminalShellCommand() {
+function desktopTerminalModeInfo(cwd = '') {
+  const configuredMode = readTerminalMode(HERMES_HOME)
+  const wslDistributions = IS_WINDOWS ? detectWslDistributions() : []
+  const resolution = resolveWindowsTerminalMode({
+    configuredMode,
+    cwd,
+    isWindows: IS_WINDOWS,
+    wslDistributions
+  })
+
+  return {
+    configuredMode,
+    distribution: resolution.distribution,
+    resolvedMode: resolution.mode,
+    supported: IS_WINDOWS,
+    wslDistributions
+  }
+}
+
+function terminalShellCommand(cwd) {
+  const modeInfo = desktopTerminalModeInfo(cwd)
+  const withMode = spec => ({ ...spec, ...modeInfo })
+
+  if (IS_WINDOWS && modeInfo.resolvedMode === 'wsl2') {
+    if (!modeInfo.distribution) {
+      throw new Error('WSL2 mode is selected, but no WSL2 distribution is installed.')
+    }
+
+    return withMode({
+      args: [
+        '--distribution',
+        modeInfo.distribution,
+        '--cd',
+        toWslPath(cwd, modeInfo.distribution),
+        '--exec',
+        'bash',
+        '-l'
+      ],
+      command: 'wsl.exe',
+      name: `wsl2:${modeInfo.distribution}`
+    })
+  }
+
   // HERMES_DESKTOP_SHELL is the cross-platform escape hatch (a path or a bare
   // name on PATH); $SHELL is honored on POSIX, where it's the user's canonical
   // choice, but ignored on Windows, where it's usually a stray MSYS/Git path
@@ -8234,17 +8294,17 @@ function terminalShellCommand() {
     const resolved = isExecutableFile(override) ? override : findOnPath(override)
 
     if (resolved) {
-      return shellSpecFor(resolved)
+      return withMode(shellSpecFor(resolved))
     }
   }
 
   if (IS_WINDOWS) {
-    return windowsShellSpec()
+    return withMode(windowsShellSpec())
   }
 
   const shellPath = ['/bin/zsh', '/bin/bash', '/bin/sh'].find(candidate => isExecutableFile(candidate))
 
-  return posixShellSpec(shellPath || '/bin/sh')
+  return withMode(posixShellSpec(shellPath || '/bin/sh'))
 }
 
 function safeTerminalCwd(cwd) {
@@ -8466,9 +8526,7 @@ ipcMain.handle('hermes:git:branchSwitch', async (_event, repoPath, branch) =>
 
 ipcMain.handle('hermes:git:branchList', async (_event, repoPath) => listBranches(repoPath, resolveGitBinary()))
 
-ipcMain.handle('hermes:git:baseBranchList', async (_event, repoPath) =>
-  listBaseBranches(repoPath, resolveGitBinary())
-)
+ipcMain.handle('hermes:git:baseBranchList', async (_event, repoPath) => listBaseBranches(repoPath, resolveGitBinary()))
 
 // Compact repo status (branch, ahead/behind, change counts + files) for the
 // composer coding rail. Returns null on a non-repo / remote backend so the rail
@@ -8522,10 +8580,17 @@ ipcMain.handle('hermes:git:scanRepos', async (_event, roots, options) => {
   }
 })
 
+ipcMain.handle('hermes:terminal-mode:get', (_event, cwd) => desktopTerminalModeInfo(safeTerminalCwd(cwd)))
+ipcMain.handle('hermes:terminal-mode:set', (_event, mode, cwd) => {
+  writeTerminalMode(HERMES_HOME, mode)
+
+  return desktopTerminalModeInfo(safeTerminalCwd(cwd))
+})
+
 ipcMain.handle('hermes:terminal:start', async (event, payload = {}) => {
   const id = crypto.randomUUID()
-  const { args, command, name } = terminalShellCommand()
   const cwd = safeTerminalCwd(payload?.cwd)
+  const { args, command, configuredMode, distribution, name, resolvedMode } = terminalShellCommand(cwd)
   const cols = Math.max(2, Number.parseInt(String(payload?.cols || 80), 10) || 80)
   const rows = Math.max(2, Number.parseInt(String(payload?.rows || 24), 10) || 24)
 
@@ -8554,7 +8619,7 @@ ipcMain.handle('hermes:terminal:start', async (event, payload = {}) => {
   })
   event.sender.once('destroyed', () => disposeTerminalSession(id))
 
-  return { cwd, id, shell: name }
+  return { configuredMode, cwd, distribution, id, mode: resolvedMode, shell: name }
 })
 
 ipcMain.handle('hermes:terminal:write', (_event, id, data) => {
