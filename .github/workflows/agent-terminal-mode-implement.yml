@@ -1,0 +1,108 @@
+name: Agent terminal mode implementation
+
+on:
+  push:
+    branches:
+      - agent/windows-terminal-modes
+
+permissions:
+  contents: write
+
+jobs:
+  implement-and-test:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/windows-terminal-modes
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Apply implementation
+        run: python .github/agent/apply_terminal_modes.py
+      - name: Format TypeScript
+        run: |
+          npx --yes prettier@3.8.3 --write \
+            apps/desktop/electron/terminal-mode.ts \
+            apps/desktop/electron/terminal-mode.test.ts \
+            apps/desktop/electron/main.ts \
+            apps/desktop/electron/preload.ts \
+            apps/desktop/src/app/right-sidebar/terminal/rail.tsx \
+            apps/desktop/src/global.d.ts
+      - name: Install validation dependencies
+        id: install
+        continue-on-error: true
+        run: |
+          python -m pip install pytest
+          npm ci --ignore-scripts
+      - name: Validate implementation
+        id: validate
+        continue-on-error: true
+        shell: bash
+        run: |
+          set +e
+          : > agent-terminal-mode-validation.log
+
+          python -m py_compile tools/environments/windows_execution_mode.py tools/environments/local.py 2>&1 | tee -a agent-terminal-mode-validation.log
+          py_compile=${PIPESTATUS[0]}
+
+          python -m pytest -q tests/tools/test_windows_execution_mode.py 2>&1 | tee -a agent-terminal-mode-validation.log
+          pytest_status=${PIPESTATUS[0]}
+
+          npm run typecheck --workspace apps/desktop 2>&1 | tee -a agent-terminal-mode-validation.log
+          typecheck=${PIPESTATUS[0]}
+
+          (cd apps/desktop && npx vitest run --project electron electron/terminal-mode.test.ts) 2>&1 | tee -a agent-terminal-mode-validation.log
+          vitest=${PIPESTATUS[0]}
+
+          (cd apps/desktop && npx eslint electron/terminal-mode.ts electron/terminal-mode.test.ts electron/main.ts electron/preload.ts src/app/right-sidebar/terminal/rail.tsx src/global.d.ts) 2>&1 | tee -a agent-terminal-mode-validation.log
+          eslint_status=${PIPESTATUS[0]}
+
+          cat > agent-terminal-mode-validation.md <<EOF
+          # Terminal mode validation
+
+          | Check | Exit code |
+          |---|---:|
+          | Python compile | ${py_compile} |
+          | Python tests | ${pytest_status} |
+          | Desktop typecheck | ${typecheck} |
+          | Electron unit test | ${vitest} |
+          | Targeted ESLint | ${eslint_status} |
+
+          Full output is in \`agent-terminal-mode-validation.log\`.
+          EOF
+
+          if [ "$py_compile" -ne 0 ] || [ "$pytest_status" -ne 0 ] || [ "$typecheck" -ne 0 ] || [ "$vitest" -ne 0 ] || [ "$eslint_status" -ne 0 ]; then
+            echo failed > .agent-terminal-mode-status
+            exit 1
+          fi
+          echo passed > .agent-terminal-mode-status
+      - name: Commit implementation and report
+        if: always()
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add \
+            apps/desktop/electron/main.ts \
+            apps/desktop/electron/preload.ts \
+            apps/desktop/electron/terminal-mode.ts \
+            apps/desktop/electron/terminal-mode.test.ts \
+            apps/desktop/src/app/right-sidebar/terminal/rail.tsx \
+            apps/desktop/src/global.d.ts \
+            tools/environments/local.py \
+            tools/environments/windows_execution_mode.py \
+            tests/tools/test_windows_execution_mode.py \
+            agent-terminal-mode-validation.md \
+            agent-terminal-mode-validation.log \
+            .agent-terminal-mode-status
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "feat(desktop): add Windows terminal modes"
+          git push
