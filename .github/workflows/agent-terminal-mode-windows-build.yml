@@ -1,0 +1,76 @@
+name: Agent terminal mode Windows build
+
+on:
+  push:
+    branches:
+      - agent/windows-terminal-modes
+
+permissions:
+  contents: write
+
+jobs:
+  windows-build:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/windows-terminal-modes
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          python -m pip install pytest
+          npm ci
+      - name: Validate and build on Windows
+        shell: pwsh
+        run: |
+          $checks = [ordered]@{}
+          $log = 'agent-terminal-mode-windows-build.log'
+          if (Test-Path $log) { Remove-Item $log }
+
+          function Run-Check([string]$Name, [scriptblock]$Command) {
+            "`n===== $Name =====" | Tee-Object -FilePath $log -Append
+            & $Command 2>&1 | Tee-Object -FilePath $log -Append
+            $script:checks[$Name] = $LASTEXITCODE
+          }
+
+          Run-Check 'Python compile' { python -m py_compile tools/environments/windows_execution_mode.py tools/environments/local.py }
+          Run-Check 'Python tests' { python -m pytest -q tests/tools/test_windows_execution_mode.py }
+          Run-Check 'Desktop typecheck' { npm run typecheck --workspace apps/desktop }
+          Run-Check 'Electron unit test' { Push-Location apps/desktop; npx vitest run --project electron electron/terminal-mode.test.ts; Pop-Location }
+          Run-Check 'Targeted ESLint' { Push-Location apps/desktop; npx eslint electron/terminal-mode.ts electron/terminal-mode.test.ts electron/main.ts electron/preload.ts src/app/right-sidebar/terminal/rail.tsx src/global.d.ts; Pop-Location }
+          Run-Check 'Desktop production build' { npm run build --workspace apps/desktop }
+
+          $lines = @('# Windows terminal mode validation', '', '| Check | Exit code |', '|---|---:|')
+          foreach ($entry in $checks.GetEnumerator()) {
+            $lines += "| $($entry.Key) | $($entry.Value) |"
+          }
+          $lines += ''
+          $lines += 'Full output is in `agent-terminal-mode-windows-build.log`.'
+          Set-Content -Path agent-terminal-mode-windows-build.md -Value $lines -Encoding utf8
+
+          $failed = $checks.Values | Where-Object { $_ -ne 0 }
+          if ($failed.Count -eq 0) {
+            Set-Content -Path .agent-terminal-mode-windows-status -Value 'passed' -Encoding ascii
+          } else {
+            Set-Content -Path .agent-terminal-mode-windows-status -Value 'failed' -Encoding ascii
+          }
+      - name: Commit Windows validation report
+        if: always()
+        shell: pwsh
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add agent-terminal-mode-windows-build.md agent-terminal-mode-windows-build.log .agent-terminal-mode-windows-status
+          if (-not (git diff --cached --quiet)) {
+            git commit -m "test(desktop): validate terminal modes on Windows"
+            git push
+          }
