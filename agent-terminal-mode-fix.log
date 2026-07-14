@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "/home/runner/work/hermes-agent/hermes-agent/.github/agent/fix_terminal_modes.py", line 17, in <module>
+    update(
+  File "/home/runner/work/hermes-agent/hermes-agent/.github/agent/fix_terminal_modes.py", line 12, in update
+    raise RuntimeError(f"{path}: expected one occurrence, found {count}: {old[:80]!r}")
+RuntimeError: apps/desktop/electron/terminal-mode.ts: expected one occurrence, found 0: "    .replace(/\\u0000/g, '')\n"
