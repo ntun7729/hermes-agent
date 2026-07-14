@@ -8597,12 +8597,15 @@ ipcMain.handle('hermes:terminal:start', async (event, payload = {}) => {
   const id = crypto.randomUUID()
   const cwd = safeTerminalCwd(payload?.cwd)
   const { args, command, configuredMode, distribution, name, resolvedMode } = terminalShellCommand(cwd)
+  // wsl.exe receives the real Linux cwd through --cd. Keep CreateProcess/node-pty
+  // on a native host directory so WSL UNC projects do not fail before wsl.exe starts.
+  const ptyCwd = resolvedMode === 'wsl2' ? app.getPath('home') : cwd
   const cols = Math.max(2, Number.parseInt(String(payload?.cols || 80), 10) || 80)
   const rows = Math.max(2, Number.parseInt(String(payload?.rows || 24), 10) || 24)
 
   const ptyProcess = nodePty.spawn(command, args, {
     cols,
-    cwd,
+    cwd: ptyCwd,
     env: terminalShellEnv(),
     name: 'xterm-256color',
     rows
