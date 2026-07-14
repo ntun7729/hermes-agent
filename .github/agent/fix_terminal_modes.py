@@ -26,6 +26,21 @@ patch_if_present(
     "    if not requested:\n        return distributions[0] if distributions else None\n",
     "    if not requested:\n        return None\n",
 )
+patch_if_present(
+    "apps/desktop/electron/main.ts",
+    "  const { args, command, configuredMode, distribution, name, resolvedMode } = terminalShellCommand(cwd)\n"
+    "  const cols = Math.max(2, Number.parseInt(String(payload?.cols || 80), 10) || 80)\n",
+    "  const { args, command, configuredMode, distribution, name, resolvedMode } = terminalShellCommand(cwd)\n"
+    "  // wsl.exe receives the real Linux cwd through --cd. Keep CreateProcess/node-pty\n"
+    "  // on a native host directory so WSL UNC projects do not fail before wsl.exe starts.\n"
+    "  const ptyCwd = resolvedMode === 'wsl2' ? app.getPath('home') : cwd\n"
+    "  const cols = Math.max(2, Number.parseInt(String(payload?.cols || 80), 10) || 80)\n",
+)
+patch_if_present(
+    "apps/desktop/electron/main.ts",
+    "    cwd,\n    env: terminalShellEnv(),\n",
+    "    cwd: ptyCwd,\n    env: terminalShellEnv(),\n",
+)
 
 rail_path = ROOT / "apps/desktop/src/app/right-sidebar/terminal/rail.tsx"
 rail = rail_path.read_text(encoding="utf-8")
