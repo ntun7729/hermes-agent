@@ -1,0 +1,112 @@
+name: Agent terminal mode validation v2
+
+on:
+  push:
+    branches:
+      - agent/windows-terminal-modes
+
+permissions:
+  contents: write
+
+jobs:
+  fix-and-test:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/windows-terminal-modes
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Apply, validate, and report
+        shell: bash
+        run: |
+          set +e
+          : > agent-terminal-mode-fix.log
+          : > agent-terminal-mode-validation.log
+
+          python .github/agent/fix_terminal_modes.py 2>&1 | tee agent-terminal-mode-fix.log
+          fix_status=${PIPESTATUS[0]}
+
+          install_status=99
+          py_compile=99
+          pytest_status=99
+          typecheck=99
+          vitest=99
+          eslint_status=99
+
+          if [ "$fix_status" -eq 0 ]; then
+            python -m pip install pytest 2>&1 | tee -a agent-terminal-mode-validation.log
+            pip_status=${PIPESTATUS[0]}
+            npm ci --ignore-scripts 2>&1 | tee -a agent-terminal-mode-validation.log
+            npm_status=${PIPESTATUS[0]}
+            if [ "$pip_status" -eq 0 ] && [ "$npm_status" -eq 0 ]; then
+              install_status=0
+
+              npx prettier --write \
+                apps/desktop/electron/terminal-mode.ts \
+                apps/desktop/electron/terminal-mode.test.ts \
+                apps/desktop/electron/main.ts \
+                apps/desktop/electron/preload.ts \
+                apps/desktop/src/app/right-sidebar/terminal/rail.tsx \
+                apps/desktop/src/global.d.ts 2>&1 | tee -a agent-terminal-mode-validation.log
+
+              (cd apps/desktop && npx eslint --fix electron/terminal-mode.ts electron/terminal-mode.test.ts electron/main.ts electron/preload.ts src/app/right-sidebar/terminal/rail.tsx src/global.d.ts) 2>&1 | tee -a agent-terminal-mode-validation.log
+
+              python -m py_compile tools/environments/windows_execution_mode.py tools/environments/local.py 2>&1 | tee -a agent-terminal-mode-validation.log
+              py_compile=${PIPESTATUS[0]}
+
+              python -m pytest -q tests/tools/test_windows_execution_mode.py 2>&1 | tee -a agent-terminal-mode-validation.log
+              pytest_status=${PIPESTATUS[0]}
+
+              npm run typecheck --workspace apps/desktop 2>&1 | tee -a agent-terminal-mode-validation.log
+              typecheck=${PIPESTATUS[0]}
+
+              (cd apps/desktop && npx vitest run --project electron electron/terminal-mode.test.ts) 2>&1 | tee -a agent-terminal-mode-validation.log
+              vitest=${PIPESTATUS[0]}
+
+              (cd apps/desktop && npx eslint electron/terminal-mode.ts electron/terminal-mode.test.ts electron/main.ts electron/preload.ts src/app/right-sidebar/terminal/rail.tsx src/global.d.ts) 2>&1 | tee -a agent-terminal-mode-validation.log
+              eslint_status=${PIPESTATUS[0]}
+            else
+              install_status=1
+            fi
+          fi
+
+          cat > agent-terminal-mode-validation.md <<EOF
+          # Terminal mode validation
+
+          | Check | Exit code |
+          |---|---:|
+          | Apply fixes | ${fix_status} |
+          | Install dependencies | ${install_status} |
+          | Python compile | ${py_compile} |
+          | Python tests | ${pytest_status} |
+          | Desktop typecheck | ${typecheck} |
+          | Electron unit test | ${vitest} |
+          | Targeted ESLint | ${eslint_status} |
+
+          Full output is in \`agent-terminal-mode-validation.log\`; patch output is in \`agent-terminal-mode-fix.log\`.
+          EOF
+
+          if [ "$fix_status" -eq 0 ] && [ "$install_status" -eq 0 ] && [ "$py_compile" -eq 0 ] && [ "$pytest_status" -eq 0 ] && [ "$typecheck" -eq 0 ] && [ "$vitest" -eq 0 ] && [ "$eslint_status" -eq 0 ]; then
+            echo passed > .agent-terminal-mode-status
+          else
+            echo failed > .agent-terminal-mode-status
+          fi
+      - name: Commit results
+        if: always()
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "fix(desktop): refine Windows terminal modes"
+          git push
