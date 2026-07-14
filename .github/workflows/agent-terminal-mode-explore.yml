@@ -1,0 +1,29 @@
+name: Agent terminal mode exploration
+
+on:
+  push:
+    branches:
+      - agent/windows-terminal-modes
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Show terminal shell helpers
+        run: |
+          grep -n "function terminalShellCommand\|function terminalShellEnv\|function safeTerminalCwd\|function resolveHermesBackend\|function startHermes" apps/desktop/electron/main.ts
+          grep -n "TERMINAL_CWD\|buildDesktopBackendEnv" apps/desktop/electron/main.ts | head -80
+      - name: Show terminal renderer integration
+        run: |
+          grep -RIn "hermesDesktop\.terminal\.start\|terminalApi\.start\|TerminalRail" apps/desktop/src/app/right-sidebar/terminal apps/desktop/src/global.d.ts | head -120
+      - name: Show local environment command path
+        run: |
+          grep -n "def _run_bash\|def _find_bash\|class LocalEnvironment\|spawn_local" tools/environments/local.py | head -120
+      - name: Show relevant tests
+        run: |
+          find apps/desktop -path '*test*' -type f | grep -E 'terminal|windows|wsl' | head -120 || true
+          find tests -type f | grep -E 'terminal|windows|wsl|local_environment' | head -120 || true
