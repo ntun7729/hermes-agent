@@ -51,7 +51,8 @@ export function parseWslDistributions(output: unknown): string[] {
   const seen = new Set<string>()
 
   return text
-    .replace(/\u0000/g, '')
+    .split('\u0000')
+    .join('')
     .split(/\r?\n/)
     .map(line => line.replace(/^\*\s*/, '').trim())
     .filter(name => {
@@ -89,7 +90,7 @@ export function distributionFromWslPath(cwd: string): string | null {
 
 function matchingDistribution(distributions: string[], requested: string | null): string | null {
   if (!requested) {
-    return distributions[0] || null
+    return null
   }
 
   return distributions.find(name => name.toLowerCase() === requested.toLowerCase()) || null

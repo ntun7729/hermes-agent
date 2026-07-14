@@ -98,7 +98,7 @@ def distribution_from_wsl_path(cwd: str) -> str | None:
 
 def _matching_distribution(distributions: list[str], requested: str | None) -> str | None:
     if not requested:
-        return distributions[0] if distributions else None
+        return None
     requested_key = requested.casefold()
     return next((name for name in distributions if name.casefold() == requested_key), None)
 
