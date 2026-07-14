@@ -1,0 +1,61 @@
+name: Validate rebased terminal modes
+
+on:
+  push:
+    branches:
+      - agent/windows-terminal-modes-rebase
+
+permissions:
+  contents: write
+
+jobs:
+  rebase-and-validate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/windows-terminal-modes-rebase
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Apply feature commit to current upstream base
+        shell: pwsh
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git cherry-pick 88e756a2080edfa209b9778a9af3dcd9ff7850ca
+          python .github/agent/rebase_terminal_modes.py
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          python -m pip install pytest
+          npm ci
+      - name: Validate exact rebased tree
+        shell: pwsh
+        run: |
+          python -m py_compile tools/environments/windows_execution_mode.py tools/environments/local.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m pytest -q tests/tools/test_windows_execution_mode.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm run typecheck --workspace apps/desktop
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Push-Location apps/desktop
+          npx vitest run --project electron electron/terminal-mode.test.ts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Pop-Location
+          npm run build --workspace apps/desktop
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Set-Content -Path .agent-terminal-mode-rebase-status -Value passed -Encoding ascii
+      - name: Commit validated rebase
+        shell: pwsh
+        run: |
+          git add apps/desktop/electron/main.ts .agent-terminal-mode-rebase-status
+          git rm .github/agent/rebase_terminal_modes.py .github/workflows/agent-terminal-mode-rebase.yml
+          git commit -m "test(desktop): validate rebased terminal modes"
+          git push
