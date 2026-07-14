@@ -64,7 +64,6 @@ import {
 } from './desktop-uninstall'
 import { installEmbedReferer } from './embed-referer'
 import { readDirForIpc } from './fs-read-dir'
-import { resolvePickerDefaultPath } from './wsl-path-bridge'
 import { probeGatewayWebSocket } from './gateway-ws-probe'
 import { scanGitRepos } from './git-repo-scan'
 import {
@@ -110,6 +109,13 @@ import {
   SESSION_WINDOW_MIN_HEIGHT,
   SESSION_WINDOW_MIN_WIDTH
 } from './session-windows'
+import {
+  detectWslDistributions,
+  readTerminalMode,
+  resolveWindowsTerminalMode,
+  toWslPath,
+  writeTerminalMode
+} from './terminal-mode'
 import { nativeOverlayWidth as computeNativeOverlayWidth, macTitleBarOverlayHeight } from './titlebar-overlay-width'
 import { resolveBehindCount, shouldCountCommits } from './update-count'
 import { readLiveUpdateMarker, writeUpdateMarker } from './update-marker'
@@ -142,13 +148,7 @@ import {
 import { readWindowsUserEnvVar } from './windows-user-env'
 import { isPackagedInstallPath as isPackagedInstallPathUnderRoots } from './workspace-cwd'
 import { readWslWindowsClipboardImage } from './wsl-clipboard-image'
-import {
-  detectWslDistributions,
-  readTerminalMode,
-  resolveWindowsTerminalMode,
-  toWslPath,
-  writeTerminalMode
-} from './terminal-mode'
+import { resolvePickerDefaultPath } from './wsl-path-bridge'
 
 const USER_DATA_OVERRIDE = process.env.HERMES_DESKTOP_USER_DATA_DIR
 
@@ -5475,6 +5475,7 @@ function openPortalLoginWindow() {
       if (settled) {
         return
       }
+
       settled = true
 
       if (pollTimer) {
@@ -5561,6 +5562,7 @@ async function discoverCloudAgents(org?: string) {
     const err = new Error(
       'You are not signed in to Hermes Cloud. Open Settings → Gateway, choose Hermes Cloud, and sign in.'
     ) as any
+
     err.needsCloudLogin = true
     throw err
   }
@@ -5929,6 +5931,7 @@ function buildRemoteBlock(remoteUrl, authMode, token, org?: string) {
     authMode,
     token
   }
+
   const orgValue = typeof org === 'string' ? org.trim() : ''
 
   if (orgValue) {
@@ -6924,6 +6927,7 @@ async function startHermes() {
 function wireCommonWindowHandlers(win, { zoom = true }: { zoom?: boolean } = {}) {
   installPreviewShortcut(win)
   installDevToolsShortcut(win)
+
   if (zoom) {
     installZoomShortcuts(win)
     // Re-apply persisted zoom on show/restore (Windows drops webContents zoom on
@@ -6931,6 +6935,7 @@ function wireCommonWindowHandlers(win, { zoom = true }: { zoom?: boolean } = {})
     installZoomReassertOnWindowEvents(win, () => restorePersistedZoomLevel(win))
     win.webContents.once('did-finish-load', () => restorePersistedZoomLevel(win))
   }
+
   installContextMenu(win)
   win.webContents.setWindowOpenHandler(details => {
     openExternalUrl(details.url)
@@ -8244,6 +8249,7 @@ function windowsShellSpec() {
 function desktopTerminalModeInfo(cwd = '') {
   const configuredMode = readTerminalMode(HERMES_HOME)
   const wslDistributions = IS_WINDOWS ? detectWslDistributions() : []
+
   const resolution = resolveWindowsTerminalMode({
     configuredMode,
     cwd,

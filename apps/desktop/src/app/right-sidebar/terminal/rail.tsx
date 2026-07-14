@@ -2,7 +2,6 @@ import { useStore } from '@nanostores/react'
 import { useEffect, useState } from 'react'
 
 import { Codicon } from '@/components/ui/codicon'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -10,6 +9,7 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger
 } from '@/components/ui/context-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Tip, TipHintLabel } from '@/components/ui/tooltip'
 import { useI18n } from '@/i18n'
 import { formatCombo } from '@/lib/keybinds/combo'
@@ -29,16 +29,26 @@ import {
   type TerminalEntry
 } from './terminals'
 
+type TerminalMode = 'smart' | 'wsl2' | 'windows-native'
+
+interface TerminalModeInfo {
+  configuredMode: TerminalMode
+  distribution: null | string
+  resolvedMode: 'windows-native' | 'wsl2'
+  supported: boolean
+  wslDistributions: string[]
+}
+
 const RAIL_ACTION =
   'grid size-6 place-items-center rounded text-(--ui-text-tertiary) transition-colors hover:bg-(--chrome-action-hover) hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring [-webkit-app-region:no-drag]'
 
-const TERMINAL_MODE_LABELS: Record<DesktopTerminalMode, string> = {
+const TERMINAL_MODE_LABELS: Record<TerminalMode, string> = {
   smart: 'Smart',
   wsl2: 'WSL2',
   'windows-native': 'Windows Native'
 }
 
-const TERMINAL_MODE_ICONS: Record<DesktopTerminalMode, string> = {
+const TERMINAL_MODE_ICONS: Record<TerminalMode, string> = {
   smart: 'server-environment',
   wsl2: 'terminal-linux',
   'windows-native': 'terminal-powershell'
@@ -55,7 +65,7 @@ export function TerminalRail() {
   const toggleHint = bindings['view.showTerminal']?.[0]
   const newHint = bindings['view.newTerminal']?.[0]
 
-  const [modeInfo, setModeInfo] = useState<DesktopTerminalModeInfo | null>(null)
+  const [modeInfo, setModeInfo] = useState<TerminalModeInfo | null>(null)
 
   useEffect(() => {
     const api = window.hermesDesktop?.terminal?.mode
@@ -70,7 +80,7 @@ export function TerminalRail() {
       .catch(() => setModeInfo(null))
   }, [])
 
-  const selectMode = (mode: DesktopTerminalMode) => {
+  const selectMode = (mode: TerminalMode) => {
     const api = window.hermesDesktop?.terminal?.mode
 
     if (!api) {
@@ -142,7 +152,7 @@ export function TerminalRail() {
               </DropdownMenuTrigger>
             </Tip>
             <DropdownMenuContent align="end" side="left">
-              {(Object.keys(TERMINAL_MODE_LABELS) as DesktopTerminalMode[]).map(mode => (
+              {(Object.keys(TERMINAL_MODE_LABELS) as TerminalMode[]).map(mode => (
                 <DropdownMenuItem
                   disabled={mode === 'wsl2' && modeInfo.wslDistributions.length === 0}
                   key={mode}
