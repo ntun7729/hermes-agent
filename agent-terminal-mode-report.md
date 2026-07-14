@@ -1,40 +1,40 @@
 # Terminal mode integration report
 
 ## Electron shell helpers
-3280:function resolveHermesBackend(backendArgs) {
-6673:async function startHermes() {
-8226:function terminalShellCommand() {
-8250:function safeTerminalCwd(cwd) {
-8262:function terminalShellEnv() {
+3298:function resolveHermesBackend(backendArgs) {
+6691:async function startHermes() {
+8263:function terminalShellCommand(cwd) {
+8310:function safeTerminalCwd(cwd) {
+8322:function terminalShellEnv() {
 
 ## Backend environment wiring
-34:import { buildDesktopBackendEnv, normalizeHermesHomeRoot } from './backend-env'
-1456:    buildDesktopBackendEnv,
-3245:    env: buildDesktopBackendEnv({
-3269:    env: buildDesktopBackendEnv({
-6530:        // the child process. Inherited TERMINAL_CWD (or a stale config bridge)
-6532:        TERMINAL_CWD: hermesCwd,
-6771:          TERMINAL_CWD: hermesCwd,
+33:import { buildDesktopBackendEnv, normalizeHermesHomeRoot } from './backend-env'
+1474:    buildDesktopBackendEnv,
+3263:    env: buildDesktopBackendEnv({
+3287:    env: buildDesktopBackendEnv({
+6548:        // the child process. Inherited TERMINAL_CWD (or a stale config bridge)
+6550:        TERMINAL_CWD: hermesCwd,
+6789:          TERMINAL_CWD: hermesCwd,
 
 ## Renderer integration
 apps/desktop/src/app/right-sidebar/terminal/chrome.tsx:4:import { TerminalRail } from './rail'
 apps/desktop/src/app/right-sidebar/terminal/chrome.tsx:21:      {terminals.length > 0 && <TerminalRail />}
-apps/desktop/src/app/right-sidebar/terminal/rail.tsx:36:export function TerminalRail() {
-apps/desktop/src/app/right-sidebar/terminal/rail.tsx:59:          <TerminalRailItem
-apps/desktop/src/app/right-sidebar/terminal/rail.tsx:101:interface TerminalRailItemProps {
-apps/desktop/src/app/right-sidebar/terminal/rail.tsx:109:function TerminalRailItem({ active, canCloseOthers, index, term, toggleHint }: TerminalRailItemProps) {
+apps/desktop/src/app/right-sidebar/terminal/rail.tsx:50:export function TerminalRail() {
+apps/desktop/src/app/right-sidebar/terminal/rail.tsx:101:          <TerminalRailItem
+apps/desktop/src/app/right-sidebar/terminal/rail.tsx:179:interface TerminalRailItemProps {
+apps/desktop/src/app/right-sidebar/terminal/rail.tsx:187:function TerminalRailItem({ active, canCloseOthers, index, term, toggleHint }: TerminalRailItemProps) {
 apps/desktop/src/app/right-sidebar/terminal/rail.test.tsx:6:import { TerminalRail } from './rail'
 apps/desktop/src/app/right-sidebar/terminal/rail.test.tsx:9:describe('TerminalRail', () => {
 apps/desktop/src/app/right-sidebar/terminal/rail.test.tsx:23:    const view = render(<TerminalRail />)
 
 ## Python local environment
-417:    # spawn path (process_registry.spawn_local builds env via this function).
-550:def _find_bash() -> str:
-662:# invocation spawn_local uses. $SHELL values outside this set (fish, csh/tcsh,
-673:    ``$SHELL`` on POSIX so that ``spawn_local`` uses the shell the user
-688:    Only POSIX-sh-family shells are honoured: ``spawn_local`` invokes the
-1013:class LocalEnvironment(BaseEnvironment):
-1084:    def _run_bash(self, cmd_string: str, *, login: bool = False,
+423:    # spawn path (process_registry.spawn_local builds env via this function).
+556:def _find_bash() -> str:
+668:# invocation spawn_local uses. $SHELL values outside this set (fish, csh/tcsh,
+679:    ``$SHELL`` on POSIX so that ``spawn_local`` uses the shell the user
+694:    Only POSIX-sh-family shells are honoured: ``spawn_local`` invokes the
+1019:class LocalEnvironment(BaseEnvironment):
+1112:    def _run_bash(self, cmd_string: str, *, login: bool = False,
 
 ## Relevant tests
 apps/desktop/src/store/windows.test.ts
@@ -45,6 +45,7 @@ apps/desktop/electron/wsl-clipboard-image.test.ts
 apps/desktop/electron/windows-child-options.test.ts
 apps/desktop/electron/windows-user-env.test.ts
 apps/desktop/electron/session-windows.test.ts
+apps/desktop/electron/terminal-mode.test.ts
 apps/desktop/electron/windows-hermes-path.test.ts
 apps/desktop/electron/wsl-path-bridge.test.ts
 tests/test_windows_subprocess_no_window_flags.py
@@ -75,6 +76,7 @@ tests/tools/test_terminal_config_env_sync.py
 tests/tools/test_terminal_none_command_guard.py
 tests/tools/test_terminal_output_transform_hook.py
 tests/tools/test_terminal_compound_background.py
+tests/tools/test_windows_execution_mode.py
 tests/tools/test_terminal_task_cwd.py
 tests/tools/test_terminal_tool_requirements.py
 tests/tools/test_windows_native_support.py
