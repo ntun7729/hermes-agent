@@ -2,27 +2,27 @@
 
 ## Electron shell helpers
 3298:function resolveHermesBackend(backendArgs) {
-6691:async function startHermes() {
-8263:function terminalShellCommand(cwd) {
-8310:function safeTerminalCwd(cwd) {
-8322:function terminalShellEnv() {
+6694:async function startHermes() {
+8269:function terminalShellCommand(cwd) {
+8316:function safeTerminalCwd(cwd) {
+8328:function terminalShellEnv() {
 
 ## Backend environment wiring
 33:import { buildDesktopBackendEnv, normalizeHermesHomeRoot } from './backend-env'
 1474:    buildDesktopBackendEnv,
 3263:    env: buildDesktopBackendEnv({
 3287:    env: buildDesktopBackendEnv({
-6548:        // the child process. Inherited TERMINAL_CWD (or a stale config bridge)
-6550:        TERMINAL_CWD: hermesCwd,
-6789:          TERMINAL_CWD: hermesCwd,
+6551:        // the child process. Inherited TERMINAL_CWD (or a stale config bridge)
+6553:        TERMINAL_CWD: hermesCwd,
+6792:          TERMINAL_CWD: hermesCwd,
 
 ## Renderer integration
 apps/desktop/src/app/right-sidebar/terminal/chrome.tsx:4:import { TerminalRail } from './rail'
 apps/desktop/src/app/right-sidebar/terminal/chrome.tsx:21:      {terminals.length > 0 && <TerminalRail />}
-apps/desktop/src/app/right-sidebar/terminal/rail.tsx:50:export function TerminalRail() {
-apps/desktop/src/app/right-sidebar/terminal/rail.tsx:101:          <TerminalRailItem
-apps/desktop/src/app/right-sidebar/terminal/rail.tsx:179:interface TerminalRailItemProps {
-apps/desktop/src/app/right-sidebar/terminal/rail.tsx:187:function TerminalRailItem({ active, canCloseOthers, index, term, toggleHint }: TerminalRailItemProps) {
+apps/desktop/src/app/right-sidebar/terminal/rail.tsx:60:export function TerminalRail() {
+apps/desktop/src/app/right-sidebar/terminal/rail.tsx:111:          <TerminalRailItem
+apps/desktop/src/app/right-sidebar/terminal/rail.tsx:189:interface TerminalRailItemProps {
+apps/desktop/src/app/right-sidebar/terminal/rail.tsx:197:function TerminalRailItem({ active, canCloseOthers, index, term, toggleHint }: TerminalRailItemProps) {
 apps/desktop/src/app/right-sidebar/terminal/rail.test.tsx:6:import { TerminalRail } from './rail'
 apps/desktop/src/app/right-sidebar/terminal/rail.test.tsx:9:describe('TerminalRail', () => {
 apps/desktop/src/app/right-sidebar/terminal/rail.test.tsx:23:    const view = render(<TerminalRail />)
