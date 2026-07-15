@@ -1,6 +1,11 @@
-import { execFileSync } from 'node:child_process'
+import { execFile, execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
+import { promisify } from 'node:util'
+
+const execFileAsync = promisify(execFile)
+
+let cachedDistributions: string[] | null = null
 
 export const TERMINAL_MODES = ['smart', 'wsl2', 'windows-native'] as const
 
@@ -47,7 +52,12 @@ export function writeTerminalMode(hermesHome: string, value: unknown): TerminalM
 }
 
 export function parseWslDistributions(output: unknown): string[] {
-  const text = Buffer.isBuffer(output) ? output.toString('utf8') : String(output || '')
+  let text = ''
+  if (Buffer.isBuffer(output)) {
+    text = output.toString('utf16le')
+  } else {
+    text = String(output || '')
+  }
   const seen = new Set<string>()
 
   return text
@@ -71,7 +81,7 @@ export function parseWslDistributions(output: unknown): string[] {
 export function detectWslDistributions(run: typeof execFileSync = execFileSync): string[] {
   try {
     const output = run('wsl.exe', ['--list', '--quiet'], {
-      encoding: 'utf8',
+      encoding: 'buffer' as any,
       stdio: ['ignore', 'pipe', 'ignore'],
       windowsHide: true
     })
@@ -80,6 +90,27 @@ export function detectWslDistributions(run: typeof execFileSync = execFileSync):
   } catch {
     return []
   }
+}
+
+export async function detectWslDistributionsAsync(): Promise<string[]> {
+  if (cachedDistributions !== null) {
+    return cachedDistributions
+  }
+  try {
+    const { stdout } = await execFileAsync('wsl.exe', ['--list', '--quiet'], {
+      encoding: 'buffer',
+      windowsHide: true
+    })
+    cachedDistributions = parseWslDistributions(stdout)
+    return cachedDistributions
+  } catch {
+    cachedDistributions = []
+    return []
+  }
+}
+
+export function clearWslDistributionCache(): void {
+  cachedDistributions = null
 }
 
 export function distributionFromWslPath(cwd: string): string | null {
@@ -114,9 +145,10 @@ export function resolveWindowsTerminalMode({
       : { distribution: null, mode: 'windows-native' }
   }
 
+  // configuredMode === 'wsl2'
   const distribution = pathDistribution || wslDistributions[0] || null
 
-  return distribution ? { distribution, mode: 'wsl2' } : { distribution: null, mode: 'windows-native' }
+  return { distribution, mode: 'wsl2' }
 }
 
 export function toWslPath(cwd: string, distribution?: string | null): string {
