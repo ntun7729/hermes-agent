@@ -28,7 +28,15 @@ describe('terminal mode', () => {
     try {
       fs.writeFileSync(
         configPath,
-        ['model:', '  provider: test', '', 'terminal:', '  timeout: 120', '  windows_execution_mode: smart', ''].join('\n'),
+        [
+          'model:',
+          '  provider: test',
+          '',
+          'terminal:',
+          '  timeout: 120',
+          '  windows_execution_mode: smart',
+          ''
+        ].join('\n'),
         'utf8'
       )
 
@@ -58,7 +66,13 @@ describe('terminal mode', () => {
     }
   })
 
-  it('parses the null-padded output returned by wsl.exe', () => {
+  it('parses UTF-16LE output returned by wsl.exe', () => {
+    const output = Buffer.from('Ubuntu\r\nDébian\r\n', 'utf16le')
+
+    expect(parseWslDistributions(output)).toEqual(['Ubuntu', 'Débian'])
+  })
+
+  it('parses null-padded string output returned by wsl.exe', () => {
     expect(
       parseWslDistributions(
         'U\u0000b\u0000u\u0000n\u0000t\u0000u\u0000\r\u0000\n\u0000D\u0000e\u0000b\u0000i\u0000a\u0000n\u0000'
