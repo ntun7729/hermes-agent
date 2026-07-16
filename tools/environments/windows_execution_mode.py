@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-import json
 import os
 import re
 import shutil
 import subprocess
 from dataclasses import dataclass
-from pathlib import Path
 
 from hermes_cli._subprocess_compat import windows_hide_flags
 
@@ -26,32 +24,13 @@ def normalize_mode(value: object) -> str:
     return value if isinstance(value, str) and value in VALID_MODES else "smart"
 
 
-def _config_path() -> Path:
-    try:
-        from hermes_constants import get_hermes_home
-
-        return get_hermes_home() / "desktop-terminal.json"
-    except Exception:
-        return Path.home() / ".hermes" / "desktop-terminal.json"
-
-
 def read_configured_mode() -> str:
-    override = os.environ.get("HERMES_WINDOWS_EXECUTION_MODE")
-    if override:
-        return normalize_mode(override)
-
+    """Read the mode from the repository-wide config.yaml source of truth."""
     try:
         from hermes_cli.config import load_config
-        config = load_config()
-        val = config.get("terminal", {}).get("windows_execution_mode")
-        if val:
-            return normalize_mode(val)
-    except Exception:
-        pass
 
-    try:
-        data = json.loads(_config_path().read_text(encoding="utf-8"))
-        return normalize_mode(data.get("mode"))
+        config = load_config()
+        return normalize_mode(config.get("terminal", {}).get("windows_execution_mode"))
     except Exception:
         return "smart"
 
